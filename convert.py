@@ -21,6 +21,7 @@ TO = {
     'binary': lambda x: int(x.replace(' ', '').replace('_', ''), 2),
     'decimal': lambda x: int(x),
     'hex': lambda x: int(x.replace(' ', '').replace('_', ''), 16),
+    'octal': lambda x: int(x, 8),
 }
 
 # FROM converts from intermediate (int) to any format
@@ -28,6 +29,7 @@ FROM = {
     'binary': lambda x: bin(x)[2:],
     'decimal': lambda x: str(x),
     'hex': lambda x: hex(x)[2:].upper(),
+    'octal': lambda x: oct(x)[2:],
 }
 
 
@@ -69,8 +71,8 @@ def main():
         description='Convert between different number bases',
         epilog='Examples:\n'
             '   convert --bin 10101 --dec\n'
-            '   convert --dec 100 --bin\n'
-            '   convert --dec 255 --hex\n'
+            '   convert --dec 100 --hex\n'
+            '   convert --dec 255 --oct\n'
             '   convert --hex FF --dec\n',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -100,6 +102,13 @@ def main():
         help='Hexadecimal format (with value as input, without value as output)'
     )
 
+    parser.add_argument(
+        '--oct',
+        nargs='?',
+        const='OUTPUT',
+        metavar='VALUE',
+        help='Octal format (with value as input, without value as output)'
+    )
 
     args = parser.parse_args()
 
@@ -111,7 +120,8 @@ def main():
     formats = {
         'binary': args.bin,
         'decimal': args.dec,
-        'hex': args.hex
+        'hex': args.hex,
+        'octal': args.oct,
     }
 
     for format_name, value in formats.items():
