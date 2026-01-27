@@ -105,6 +105,9 @@ def main():
         help='Hexadecimal format (with value as input, without value as output)'
     )
 
+
+    args = parser.parse_args()
+
     # Determine which argument has a value (input) and which is just a flag (output)
     input_type = None
     input_value = None
@@ -116,7 +119,7 @@ def main():
         'hex': args.hex
     }
 
-    for format_name, value in formats.items()
+    for format_name, value in formats.items():
         if value is not None:
             if value == 'OUTPUT':
                 # This is the output format (flag without value)
@@ -163,7 +166,7 @@ def main():
             sys.exit(1)
 
         # Perform the conversion
-        result = conversion_fun(input_value)
+        result = conversion_func(input_value)
 
         # Format output with proper capitalization
         input_display = input_type.capitalize()
