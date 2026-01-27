@@ -12,9 +12,7 @@ Usage:
 import argparse
 import sys
 
-# ============================================================================
 # NUMBER BASE CONVERSIONS (via integer intermediate)
-# ============================================================================
 TO_INT = {
     'binary': lambda x: int(x.replace(' ', '').replace('_', ''), 2),
     'decimal': lambda x: int(x),
@@ -29,9 +27,7 @@ FROM_INT = {
     'octal': lambda x: oct(x)[2:],
 }
 
-# ============================================================================
 # TEMPERATURE CONVERSIONS (via Celsius intermediate)
-# ============================================================================
 TO_CELSIUS = {
     'celsius': lambda x: float(x),
     'fahrenheit': lambda x: (float(x) - 32) * 5/9,
@@ -44,9 +40,7 @@ FROM_CELSIUS = {
     'kelvin': lambda x: round(x + 273.15, 2),
 }
 
-# ============================================================================
 # LENGTH CONVERSIONS (via meters intermediate)
-# ============================================================================
 TO_METERS = {
     'meters': lambda x: float(x),
     'kilometers': lambda x: float(x) * 1000,
@@ -69,9 +63,7 @@ FROM_METERS = {
     'miles': lambda x: round(x / 1609.34, 4),
 }
 
-# ============================================================================
 # WEIGHT CONVERSIONS (via kilograms intermediate)
-# ============================================================================
 TO_KILOGRAMS = {
     'kilograms': lambda x: float(x),
     'grams': lambda x: float(x) / 1000,
@@ -90,9 +82,7 @@ FROM_KILOGRAMS = {
     'tons': lambda x: round(x / 1000, 4),
 }
 
-# ============================================================================
 # TIME CONVERSIONS (via seconds intermediate)
-# ============================================================================
 TO_SECONDS = {
     'seconds': lambda x: float(x),
     'minutes': lambda x: float(x) * 60,
@@ -109,9 +99,24 @@ FROM_SECONDS = {
     'weeks': lambda x: round(x / 604800, 4),
 }
 
-# ============================================================================
+
+# DATA CONVERSIONS (via bits intermediate)
+TO_BITS = {
+    'bits': lambda x: float(x),
+    'bytes': lambda x: float(x) * 8,
+    'kilobytes': lambda x: float(x) * 8 * 1024,
+}
+
+FROM_BITS = {
+    'bits': lambda x: round(x, 2),
+    'bytes': lambda x: round(x / 8, 2),
+    'kilobytes': lambda x: round(x / (8 * 1024), 2),
+}
+
+
+
+
 # FORMAT CATEGORIES - Maps each format to its conversion category
-# ============================================================================
 FORMAT_CATEGORIES = {
     # Number bases
     'binary': 'number',
@@ -148,6 +153,11 @@ FORMAT_CATEGORIES = {
     'hours': 'time',
     'days': 'time',
     'weeks': 'time',
+
+    # Data
+    'bits': 'data',
+    'bytes': 'data',
+    'kilobytes': 'data',
 }
 
 # Category conversion tables
@@ -157,6 +167,7 @@ CATEGORY_CONVERTERS = {
     'length': (TO_METERS, FROM_METERS),
     'weight': (TO_KILOGRAMS, FROM_KILOGRAMS),
     'time': (TO_SECONDS, FROM_SECONDS),
+    'data': (TO_BITS, FROM_BITS),
 }
 
 def convert(value, from_format, to_format):
@@ -195,7 +206,7 @@ def main():
         epilog='Examples:\n'
                '  convert --bin 10101 --dec           (binary to decimal)\n'
                '  convert --dec 100 --hex             (decimal to hex)\n'
-               '  convert --f 98.6 --c                (Fahrenheit to Celsius)\n'
+               '  convert --F 98.6 --C                (Fahrenheit to Celsius)\n'
                '  convert --ft 10 --m                 (feet to meters)\n'
                '  convert --lb 150 --kg               (pounds to kilograms)\n'
                '  convert --h 2.5 --min               (hours to minutes)\n',
@@ -215,11 +226,11 @@ def main():
                        help='Octal format')
     
     # Temperature
-    parser.add_argument('--c', nargs='?', const='OUTPUT', metavar='VALUE',
+    parser.add_argument('--C', nargs='?', const='OUTPUT', metavar='VALUE',
                        help='Celsius temperature')
-    parser.add_argument('--f', nargs='?', const='OUTPUT', metavar='VALUE',
+    parser.add_argument('--F', nargs='?', const='OUTPUT', metavar='VALUE',
                        help='Fahrenheit temperature')
-    parser.add_argument('--k', nargs='?', const='OUTPUT', metavar='VALUE',
+    parser.add_argument('--K', nargs='?', const='OUTPUT', metavar='VALUE',
                        help='Kelvin temperature')
     
     # Length
@@ -265,7 +276,12 @@ def main():
                        help='Days')
     parser.add_argument('--w', nargs='?', const='OUTPUT', metavar='VALUE',
                        help='Weeks')
-    
+
+    parser.add_argument('--b', nargs='?', const='OUTPUT', metavar='VALUE', help='Bits')
+    parser.add_argument('--B', nargs='?', const='OUTPUT', metavar='VALUE', help='Bytes')
+    parser.add_argument('--kb', nargs='?', const='OUTPUT', metavar='VALUE', help='Kilobytes')
+
+            
     args = parser.parse_args()
     
     # Determine which argument has a value (input) and which is just a flag (output)
@@ -279,9 +295,9 @@ def main():
         'dec': 'decimal',
         'hex': 'hex',
         'oct': 'octal',
-        'c': 'celsius',
-        'f': 'fahrenheit',
-        'k': 'kelvin',
+        'C': 'celsius',
+        'F': 'fahrenheit',
+        'K': 'kelvin',
         'm': 'meters',
         'km': 'kilometers',
         'cm': 'centimeters',
@@ -301,6 +317,9 @@ def main():
         'h': 'hours',
         'd': 'days',
         'w': 'weeks',
+        'b': 'bits',
+        'B': 'bytes',
+        'kb': 'kilobytes',
     }
     
     # Get all argument values
@@ -309,9 +328,9 @@ def main():
         'dec': args.dec,
         'hex': args.hex,
         'oct': args.oct,
-        'c': args.c,
-        'f': args.f,
-        'k': args.k,
+        'C': args.C,
+        'F': args.F,
+        'K': args.K,
         'm': args.m,
         'km': args.km,
         'cm': args.cm,
@@ -331,6 +350,9 @@ def main():
         'h': args.h,
         'd': args.d,
         'w': args.w,
+        'b': args.b,
+        'B': args.B,
+        'kb': args.kb,
     }
     
     for arg_name, value in arg_values.items():
@@ -388,6 +410,9 @@ def main():
         'hours': 'h',
         'days': 'd',
         'weeks': 'w',
+        'bits': 'b',
+        'bytes': 'B',
+        'kilobytes': 'kb',
     }
     
     try:
