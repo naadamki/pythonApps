@@ -15,56 +15,51 @@ import argparse
 import sys
 
 
-# Conversion functions
-def binary_to_decimal(binary_str):
-    """Convert binary string to decimal"""
-    try:
-        binary_str = binary_str.replace(' ', '').replace('_', '')
-        return int(binary_str, 2)
-    except ValueError:
-        raise ValueError(f"Invalid binary number: {binary_str}")
+# Conversion maps for all supported formats
+# TO converts any format to an intermediate (int)
+TO = {
+    'binary': lambda x: int(x.replace(' ', '').replace('_', ''), 2),
+    'decimal': lambda x: int(x),
+    'hex': lambda x: int(x.replace(' ', '').replace('_', ''), 16),
+}
 
-def decimal_to_binary(decimal_str):
-    """Convert decimal string to binary"""
+# FROM converts from intermediate (int) to any format
+FROM = {
+    'binary': lambda x: bin(x)[2:],
+    'decimal': lambda x: str(x),
+    'hex': lambda x: hex(x)[2:].upper(),
+}
+
+
+def to_intermediate(value, from_format):
+    """Convert any supported format to intermediate integer format"""
     try:
-        decimal = int(decimal_str)
-        if decimal < 0:
-            raise ValueError("Negative numbers are not supported yet")
-        return bin(decimal)[2:]
+        converter = TO.get(from_format)
+        if converter is None:
+            raise ValueError(f"Unknown format: {from_format}")
+        return converter(value)
     except ValueError as e:
         if "invalid literal" in str(e):
-            raise ValueError(f"Invalid decimal number: {decimal_str}")
+            raise ValueError(f"Invalid {from_format} number: {value}")
         raise
 
-def decimal_to_hex(decimal_str):
-    """Convert decimal string to hexadecimal"""
+def from_intermediate(int_value, to_format):
+    """Convert intermediate integer format to any supported format"""
     try:
-        decimal = int(decimal_str)
-        if decimal < 0:
+        if int_value < 0:
             raise ValueError("Negative numbers not supported yet")
-        return hex(decimal)[2:].upper()
-    except ValueError as e:
-        if "invalid literal" in str(e):
-            raise ValueError(f"Invalid decimal number: {decimal_str}")
+        
+        converter = FROM.get(to_format)
+        if converter is None:
+            raise ValueError(f"Unknown format: {to_format}")
+        return converter(int_value)
+    except ValueError:
         raise
 
-def hex_to_decimal(hex_str):
-    """Convert hexadecimal string to decimal"""
-    try:
-        hex_str = hex_str.replace(' ', '').replace('_', '')
-        return int(hex_str, 16)
-    except ValueError:
-        raise ValueError(f"Invalid hexadecimal number: {hex_str}")
-
-def binary_to_hex(binary_str):
-    """Convert binary to hexadecimal"""
-    decimal = binary_to_decimal(binary_str)
-    return hex(decimal)[2:].upper()
-
-def hex_to_binary(hex_str):
-    """Convert hexadecimal to binary"""
-    decimal = hex_to_decimal(hex_str)
-    return bin(decimal)[2:]
+def convert(value, from_format, to_format):
+    """Convert from one format to another via intermediate integer"""
+    int_value = to_intermediate(value, from_format)
+    return from_intermediate(int_value, to_format)
 
 
 
@@ -145,28 +140,9 @@ def main():
         print(f"{input_type.capitalize()}: {input_value}")
         return
 
-    # Conversion table: (input_type, output_type) -> conversion_function
-    conversions = {
-        ('binary', 'decimal'): binary_to_decimal,
-        ('decimal', 'binary'): decimal_to_binary,
-        ('decimal', 'hex'): decimal_to_hex,
-        ('hex', 'decimal'): hex_to_decimal,
-        ('binary', 'hex'): binary_to_hex,
-        ('hex', 'binary'): hex_to_binary,
-    }
-
-
     try:
-        # Look up the conversion function
-        conversion_key = (input_type, output_type)
-        conversion_func = conversions.get(conversion_key)
-
-        if conversion_func is None:
-            print(f"Conversion from {input_type} to {output_type} not yet implemented")
-            sys.exit(1)
-
-        # Perform the conversion
-        result = conversion_func(input_value)
+        # Perform conversion using generic convert function
+        result = convert(input_value, input_type, output_type)
 
         # Format output with proper capitalization
         input_display = input_type.capitalize()
