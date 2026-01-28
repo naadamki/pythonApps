@@ -1,433 +1,224 @@
 #!/usr/bin/env python3
-"""
-Convert - A CLI tool for number base conversions
-Currently supports: binary ↔ decimal ↔ hexadecimal
-
-Usage:
-    convert --bin 10101 --dec       (converts binary to decimal)
-    convert --dec 100 --bin         (converts decimal to binary)
-    convert --dec 255 --hex         (converts decimal to hex)
-"""
-
 import argparse
 import sys
 
-# NUMBER BASE CONVERSIONS (via integer intermediate)
-TO_INT = {
-    'binary': lambda x: int(x.replace(' ', '').replace('_', ''), 2),
-    'decimal': lambda x: int(x),
-    'hex': lambda x: int(x.replace(' ', '').replace('_', ''), 16),
-    'octal': lambda x: int(x.replace(' ', '').replace('_', ''), 8),
+# SINGLE SOURCE OF TRUTH (display name, conversion to, conversion from)
+UNIT_DATA = {
+    'number': {
+        'bin': ('binary',       lambda x: int(str(x).replace(' ', ''), 2),  lambda x: bin(x)[2:]),
+        'dec': ('decimal',      lambda x: int(x),                           lambda x: str(x)),
+        'hex': ('hexadecimal',  lambda x: int(str(x).replace(' ', ''), 16), lambda x: hex(x)[2:].upper()),
+        'oct': ('octal',        lambda x: int(str(x).replace(' ', ''), 8),  lambda x: oct(x)[2:]),
+    },
+    'temperature': {
+        'F': ('Fahrenheit',     lambda x: (float(x) - 32) * 5/9,            lambda x: round((x * 9/5) + 32, 2)),
+        'C': ('Celsius',        lambda x: float(x),                         lambda x: round(x, 2)),
+        'K': ('Kelvin',         lambda x: float(x) - 273.15,                lambda x: round(x + 273.15, 2)),
+    },
+    'length': {
+        # Metric (descending)
+        'km':  ('kilometer',    lambda x: float(x) * 1000,                  lambda x: round(x / 1000, 4)),
+        'm':   ('meter',        lambda x: float(x),                         lambda x: round(x, 4)),
+        'cm':  ('centimeter',   lambda x: float(x) / 100,                   lambda x: round(x * 100, 4)),
+        'mm':  ('millimeter',   lambda x: float(x) / 1000,                  lambda x: round(x * 1000, 4)),
+        'um':  ('micrometer',   lambda x: float(x) / 1_000_000,             lambda x: round(x * 1_000_000, 4)),
+        'nm':  ('nanometer',    lambda x: float(x) / 1_000_000_000,         lambda x: round(x * 1_000_000_000, 4)),
+        # Imperial (descending)
+        'mi':  ('mile',         lambda x: float(x) * 1609.34,               lambda x: round(x / 1609.34, 4)),
+        'yd':  ('yard',         lambda x: float(x) * 0.9144,                lambda x: round(x / 0.9144, 4)),
+        'ft':  ('foot',         lambda x: float(x) * 0.3048,                lambda x: round(x / 0.3048, 4)),
+        'in':  ('inch',         lambda x: float(x) * 0.0254,                lambda x: round(x / 0.0254, 4)),
+    },
+    'weight': {
+        # Metric (descending)
+        't':   ('metric ton',   lambda x: float(x) * 1000,                  lambda x: round(x / 1000, 4)),
+        'kg':  ('kilogram',     lambda x: float(x),                         lambda x: round(x, 4)),
+        'g':   ('gram',         lambda x: float(x) / 1000,                  lambda x: round(x * 1000, 4)),
+        'mg':  ('milligram',    lambda x: float(x) / 1_000_000,             lambda x: round(x * 1_000_000, 4)),
+        'ug':  ('microgram',    lambda x: float(x) / 1_000_000_000,         lambda x: round(x * 1_000_000_000, 4)),
+        # Imperial (descending)
+        'ton': ('US ton',       lambda x: float(x) * 907.185,               lambda x: round(x / 907.185, 4)),
+        'st':  ('stone',        lambda x: float(x) * 6.35029,               lambda x: round(x / 6.35029, 4)),
+        'lb':  ('pound',        lambda x: float(x) * 0.453592,              lambda x: round(x / 0.453592, 4)),
+        'oz':  ('ounce',        lambda x: float(x) * 0.0283495,             lambda x: round(x / 0.0283495, 4)),
+    },
+    'liquid': {
+        # Metric (descending)
+        'kl':  ('kiloliter',    lambda x: float(x) * 1000,                  lambda x: round(x / 1000, 4)),
+        'l':   ('liter',        lambda x: float(x),                         lambda x: round(x, 4)),
+        'dl':  ('deciliter',    lambda x: float(x) / 10,                    lambda x: round(x * 10, 4)),
+        'cl':  ('centiliter',   lambda x: float(x) / 100,                   lambda x: round(x * 100, 4)),
+        'ml':  ('milliliter',   lambda x: float(x) / 1000,                  lambda x: round(x * 1000, 4)),
+        # Imperial/US (descending)
+        'gal': ('gallon',       lambda x: float(x) * 3.78541,               lambda x: round(x / 3.78541, 4)),
+        'qt':  ('quart',        lambda x: float(x) * 0.946353,              lambda x: round(x / 0.946353, 4)),
+        'pt':  ('pint',         lambda x: float(x) * 0.473176,              lambda x: round(x / 0.473176, 4)),
+        'cup': ('cup',          lambda x: float(x) * 0.236588,              lambda x: round(x / 0.236588, 4)),
+        'floz':('fluid ounce',  lambda x: float(x) * 0.0295735,             lambda x: round(x / 0.0295735, 4)),
+        'tbsp':('tablespoon',   lambda x: float(x) * 0.0147868,             lambda x: round(x / 0.0147868, 4)),
+        'tsp': ('teaspoon',     lambda x: float(x) * 0.00492892,            lambda x: round(x / 0.00492892, 4)),
+    },
+    'area': {
+        # Metric (descending)
+        'km2': ('square kilometer', lambda x: float(x) * 1_000_000,         lambda x: round(x / 1_000_000, 4)),
+        'ha':  ('hectare',      lambda x: float(x) * 10_000,                lambda x: round(x / 10_000, 4)),
+        'm2':  ('square meter', lambda x: float(x),                         lambda x: round(x, 4)),
+        'cm2': ('square centimeter', lambda x: float(x) / 10_000,           lambda x: round(x * 10_000, 4)),
+        'mm2': ('square millimeter', lambda x: float(x) / 1_000_000,        lambda x: round(x * 1_000_000, 4)),
+        # Imperial (descending)
+        'mi2': ('square mile',  lambda x: float(x) * 2_589_988,             lambda x: round(x / 2_589_988, 4)),
+        'ac':  ('acre',         lambda x: float(x) * 4046.86,               lambda x: round(x / 4046.86, 4)),
+        'yd2': ('square yard',  lambda x: float(x) * 0.836127,              lambda x: round(x / 0.836127, 4)),
+        'ft2': ('square foot',  lambda x: float(x) * 0.092903,              lambda x: round(x / 0.092903, 4)),
+        'in2': ('square inch',  lambda x: float(x) * 0.00064516,            lambda x: round(x / 0.00064516, 4)),
+    },
+    'volume': {
+        # Metric (descending)
+        'km3': ('cubic kilometer', lambda x: float(x) * 1_000_000_000,      lambda x: round(x / 1_000_000_000, 4)),
+        'm3':  ('cubic meter',  lambda x: float(x),                         lambda x: round(x, 4)),
+        'cm3': ('cubic centimeter', lambda x: float(x) / 1_000_000,         lambda x: round(x * 1_000_000, 4)),
+        'mm3': ('cubic millimeter', lambda x: float(x) / 1_000_000_000,     lambda x: round(x * 1_000_000_000, 4)),
+        # Imperial (descending)
+        'mi3': ('cubic mile',   lambda x: float(x) * 4_168_181_825,         lambda x: round(x / 4_168_181_825, 4)),
+        'yd3': ('cubic yard',   lambda x: float(x) * 0.764555,              lambda x: round(x / 0.764555, 4)),
+        'ft3': ('cubic foot',   lambda x: float(x) * 0.0283168,             lambda x: round(x / 0.0283168, 4)),
+        'in3': ('cubic inch',   lambda x: float(x) * 0.0000163871,          lambda x: round(x / 0.0000163871, 4)),
+    },
+    'time': {
+        'yr':  ('year',         lambda x: float(x) * 31_536_000,            lambda x: round(x / 31_536_000, 4)),
+        'mo':  ('month',        lambda x: float(x) * 2_592_000,             lambda x: round(x / 2_592_000, 4)),
+        'wk':  ('week',         lambda x: float(x) * 604_800,               lambda x: round(x / 604_800, 4)),
+        'd':   ('day',          lambda x: float(x) * 86_400,                lambda x: round(x / 86_400, 4)),
+        'hr':  ('hour',         lambda x: float(x) * 3600,                  lambda x: round(x / 3600, 4)),
+        'min': ('minute',       lambda x: float(x) * 60,                    lambda x: round(x / 60, 4)),
+        's':   ('second',       lambda x: float(x),                         lambda x: round(x, 4)),
+        'ms':  ('millisecond',  lambda x: float(x) / 1000,                  lambda x: round(x * 1000, 4)),
+        'us':  ('microsecond',  lambda x: float(x) / 1_000_000,             lambda x: round(x * 1_000_000, 4)),
+    },
+    'speed': {
+        # Metric (descending)
+        'km/h': ('kilometer/hour', lambda x: float(x) / 3.6,                lambda x: round(x * 3.6, 4)),
+        'm/s':  ('meter/second', lambda x: float(x),                        lambda x: round(x, 4)),
+        # Imperial (descending)
+        'mph': ('mile/hour',    lambda x: float(x) * 0.44704,               lambda x: round(x / 0.44704, 4)),
+        'fps': ('foot/second',  lambda x: float(x) * 0.3048,                lambda x: round(x / 0.3048, 4)),
+        # Other
+        'kn':  ('knot',         lambda x: float(x) * 0.514444,              lambda x: round(x / 0.514444, 4)),
+    },
+    'data': {
+        'tb':  ('terabyte',     lambda x: float(x) * 8 * 1024**4,           lambda x: round(x / (8 * 1024**4), 2)),
+        'gb':  ('gigabyte',     lambda x: float(x) * 8 * 1024**3,           lambda x: round(x / (8 * 1024**3), 2)),
+        'mb':  ('megabyte',     lambda x: float(x) * 8 * 1024**2,           lambda x: round(x / (8 * 1024**2), 2)),
+        'kb':  ('kilobyte',     lambda x: float(x) * 8 * 1024,              lambda x: round(x / (8 * 1024), 2)),
+        'byte':('byte',         lambda x: float(x) * 8,                     lambda x: round(x / 8, 2)),
+        'bit': ('bit',          lambda x: float(x),                         lambda x: round(x, 2)),
+    },
+    'pressure': {
+        # Metric (descending)
+        'bar': ('bar',          lambda x: float(x) * 100_000,               lambda x: round(x / 100_000, 4)),
+        'kpa': ('kilopascal',   lambda x: float(x) * 1000,                  lambda x: round(x / 1000, 4)),
+        'pa':  ('pascal',       lambda x: float(x),                         lambda x: round(x, 4)),
+        # Imperial/Other (descending)
+        'psi': ('pound/sq inch', lambda x: float(x) * 6894.76,              lambda x: round(x / 6894.76, 4)),
+        'atm': ('atmosphere',   lambda x: float(x) * 101_325,               lambda x: round(x / 101_325, 4)),
+        'mmhg':('mmHg',         lambda x: float(x) * 133.322,               lambda x: round(x / 133.322, 4)),
+    },
+    'energy': {
+        # Metric (descending)
+        'kj':  ('kilojoule',    lambda x: float(x) * 1000,                  lambda x: round(x / 1000, 4)),
+        'j':   ('joule',        lambda x: float(x),                         lambda x: round(x, 4)),
+        # Imperial/Other (descending)
+        'kwh': ('kilowatt-hour', lambda x: float(x) * 3_600_000,            lambda x: round(x / 3_600_000, 4)),
+        'cal': ('calorie',      lambda x: float(x) * 4.184,                 lambda x: round(x / 4.184, 4)),
+        'kcal':('kilocalorie',  lambda x: float(x) * 4184,                  lambda x: round(x / 4184, 4)),
+        'btu': ('BTU',          lambda x: float(x) * 1055.06,               lambda x: round(x / 1055.06, 4)),
+    },
 }
 
-FROM_INT = {
-    'binary': lambda x: bin(x)[2:],
-    'decimal': lambda x: str(x),
-    'hex': lambda x: hex(x)[2:].upper(),
-    'octal': lambda x: oct(x)[2:],
-}
 
-# TEMPERATURE CONVERSIONS (via Celsius intermediate)
-TO_CELSIUS = {
-    'celsius': lambda x: float(x),
-    'fahrenheit': lambda x: (float(x) - 32) * 5/9,
-    'kelvin': lambda x: float(x) - 273.15,
-}
-
-FROM_CELSIUS = {
-    'celsius': lambda x: round(x, 2),
-    'fahrenheit': lambda x: round((x * 9/5) + 32, 2),
-    'kelvin': lambda x: round(x + 273.15, 2),
-}
-
-# LENGTH CONVERSIONS (via meters intermediate)
-TO_METERS = {
-    'meters': lambda x: float(x),
-    'kilometers': lambda x: float(x) * 1000,
-    'centimeters': lambda x: float(x) / 100,
-    'millimeters': lambda x: float(x) / 1000,
-    'feet': lambda x: float(x) * 0.3048,
-    'inches': lambda x: float(x) * 0.0254,
-    'yards': lambda x: float(x) * 0.9144,
-    'miles': lambda x: float(x) * 1609.34,
-}
-
-FROM_METERS = {
-    'meters': lambda x: round(x, 4),
-    'kilometers': lambda x: round(x / 1000, 4),
-    'centimeters': lambda x: round(x * 100, 4),
-    'millimeters': lambda x: round(x * 1000, 4),
-    'feet': lambda x: round(x / 0.3048, 4),
-    'inches': lambda x: round(x / 0.0254, 4),
-    'yards': lambda x: round(x / 0.9144, 4),
-    'miles': lambda x: round(x / 1609.34, 4),
-}
-
-# WEIGHT CONVERSIONS (via kilograms intermediate)
-TO_KILOGRAMS = {
-    'kilograms': lambda x: float(x),
-    'grams': lambda x: float(x) / 1000,
-    'milligrams': lambda x: float(x) / 1_000_000,
-    'pounds': lambda x: float(x) * 0.453592,
-    'ounces': lambda x: float(x) * 0.0283495,
-    'tons': lambda x: float(x) * 1000,
-}
-
-FROM_KILOGRAMS = {
-    'kilograms': lambda x: round(x, 4),
-    'grams': lambda x: round(x * 1000, 4),
-    'milligrams': lambda x: round(x * 1_000_000, 4),
-    'pounds': lambda x: round(x / 0.453592, 4),
-    'ounces': lambda x: round(x / 0.0283495, 4),
-    'tons': lambda x: round(x / 1000, 4),
-}
-
-# TIME CONVERSIONS (via seconds intermediate)
-TO_SECONDS = {
-    'seconds': lambda x: float(x),
-    'minutes': lambda x: float(x) * 60,
-    'hours': lambda x: float(x) * 3600,
-    'days': lambda x: float(x) * 86400,
-    'weeks': lambda x: float(x) * 604800,
-}
-
-FROM_SECONDS = {
-    'seconds': lambda x: round(x, 4),
-    'minutes': lambda x: round(x / 60, 4),
-    'hours': lambda x: round(x / 3600, 4),
-    'days': lambda x: round(x / 86400, 4),
-    'weeks': lambda x: round(x / 604800, 4),
+# Special pluralization rules
+PLURAL_EXCEPTIONS = {
+    'foot': 'feet',
+    'inch': 'inches',
 }
 
 
-# DATA CONVERSIONS (via bits intermediate)
-TO_BITS = {
-    'bits': lambda x: float(x),
-    'bytes': lambda x: float(x) * 8,
-    'kilobytes': lambda x: float(x) * 8 * 1024,
-}
-
-FROM_BITS = {
-    'bits': lambda x: round(x, 2),
-    'bytes': lambda x: round(x / 8, 2),
-    'kilobytes': lambda x: round(x / (8 * 1024), 2),
-}
-
-
-
-
-# FORMAT CATEGORIES - Maps each format to its conversion category
-FORMAT_CATEGORIES = {
-    # Number bases
-    'binary': 'number',
-    'decimal': 'number',
-    'hex': 'number',
-    'octal': 'number',
+def pluralize(unit_name, value):
+    """Convert unit name to plural form if value != 1"""
+    # Handle special cases that don't change (already plural or invariant)
+    if unit_name in ['Celsius', 'Fahrenheit', 'Kelvin', 'binary', 'decimal', 
+                     'hexadecimal', 'octal', 'stone', 'mmHg', 'BTU']:
+        return unit_name
     
-    # Temperature
-    'celsius': 'temperature',
-    'fahrenheit': 'temperature',
-    'kelvin': 'temperature',
-    
-    # Length
-    'meters': 'length',
-    'kilometers': 'length',
-    'centimeters': 'length',
-    'millimeters': 'length',
-    'feet': 'length',
-    'inches': 'length',
-    'yards': 'length',
-    'miles': 'length',
-    
-    # Weight
-    'kilograms': 'weight',
-    'grams': 'weight',
-    'milligrams': 'weight',
-    'pounds': 'weight',
-    'ounces': 'weight',
-    'tons': 'weight',
-    
-    # Time
-    'seconds': 'time',
-    'minutes': 'time',
-    'hours': 'time',
-    'days': 'time',
-    'weeks': 'time',
-
-    # Data
-    'bits': 'data',
-    'bytes': 'data',
-    'kilobytes': 'data',
-}
-
-# Category conversion tables
-CATEGORY_CONVERTERS = {
-    'number': (TO_INT, FROM_INT),
-    'temperature': (TO_CELSIUS, FROM_CELSIUS),
-    'length': (TO_METERS, FROM_METERS),
-    'weight': (TO_KILOGRAMS, FROM_KILOGRAMS),
-    'time': (TO_SECONDS, FROM_SECONDS),
-    'data': (TO_BITS, FROM_BITS),
-}
-
-def convert(value, from_format, to_format):
-    """Convert from one format to another"""
-    # Get categories
-    from_category = FORMAT_CATEGORIES.get(from_format)
-    to_category = FORMAT_CATEGORIES.get(to_format)
-    
-    if from_category is None:
-        raise ValueError(f"Unknown format: {from_format}")
-    if to_category is None:
-        raise ValueError(f"Unknown format: {to_format}")
-    
-    # Check if formats are in the same category
-    if from_category != to_category:
-        raise ValueError(f"Cannot convert between {from_category} and {to_category}")
-    
-    # Get the appropriate converters for this category
-    to_intermediate, from_intermediate = CATEGORY_CONVERTERS[from_category]
-    
+    # Check if value is exactly 1 (or -1)
     try:
-        # Convert to intermediate, then to target format
-        intermediate_value = to_intermediate[from_format](value)
-        result = from_intermediate[to_format](intermediate_value)
-        return result
-    except ValueError as e:
-        if "invalid literal" in str(e) or "could not convert" in str(e):
-            raise ValueError(f"Invalid {from_format} value: {value}")
-        raise
-    except KeyError:
-        raise ValueError(f"Conversion from {from_format} to {to_format} not implemented")
+        num_val = float(value)
+        if abs(num_val) == 1:
+            return unit_name
+    except (ValueError, TypeError):
+        # For non-numeric values (like binary strings), just add 's'
+        pass
+    
+    # Check for special plural forms
+    if unit_name in PLURAL_EXCEPTIONS:
+        return PLURAL_EXCEPTIONS[unit_name]
+    
+    # Default: add 's' for plural
+    return unit_name + 's'
+
+
+# Lookup: { 'unit_key': (category, display_name, to_func, from_func) }
+FLAT_MAP = {
+    unit: (cat, data[0], data[1], data[2])
+    for cat, units in UNIT_DATA.items()
+    for unit, data in units.items()
+}
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Convert between different units and number bases',
-        epilog='Examples:\n'
-               '  convert --bin 10101 --dec           (binary to decimal)\n'
-               '  convert --dec 100 --hex             (decimal to hex)\n'
-               '  convert --F 98.6 --C                (Fahrenheit to Celsius)\n'
-               '  convert --ft 10 --m                 (feet to meters)\n'
-               '  convert --lb 150 --kg               (pounds to kilograms)\n'
-               '  convert --h 2.5 --min               (hours to minutes)\n',
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        description="Converter",
+        formatter_class=argparse.RawTextHelpFormatter,
+        prefix_chars='-/'
     )
     
-    # All format flags can be used as input (with value) or output (without value)
-    
-    # Number bases
-    parser.add_argument('--bin', nargs='?', const='OUTPUT', metavar='VALUE', 
-                       help='Binary format')
-    parser.add_argument('--dec', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Decimal format')
-    parser.add_argument('--hex', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Hexadecimal format')
-    parser.add_argument('--oct', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Octal format')
-    
-    # Temperature
-    parser.add_argument('--C', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Celsius temperature')
-    parser.add_argument('--F', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Fahrenheit temperature')
-    parser.add_argument('--K', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Kelvin temperature')
-    
-    # Length
-    parser.add_argument('--m', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Meters')
-    parser.add_argument('--km', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Kilometers')
-    parser.add_argument('--cm', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Centimeters')
-    parser.add_argument('--mm', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Millimeters')
-    parser.add_argument('--ft', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Feet')
-    parser.add_argument('--in', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Inches')
-    parser.add_argument('--yd', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Yards')
-    parser.add_argument('--mi', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Miles')
-    
-    # Weight
-    parser.add_argument('--kg', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Kilograms')
-    parser.add_argument('--g', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Grams')
-    parser.add_argument('--mg', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Milligrams')
-    parser.add_argument('--lb', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Pounds')
-    parser.add_argument('--oz', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Ounces')
-    parser.add_argument('--t', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Metric tons')
-    
-    # Time
-    parser.add_argument('--s', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Seconds')
-    parser.add_argument('--min', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Minutes')
-    parser.add_argument('--h', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Hours')
-    parser.add_argument('--d', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Days')
-    parser.add_argument('--w', nargs='?', const='OUTPUT', metavar='VALUE',
-                       help='Weeks')
+    for cat_name, units in UNIT_DATA.items():
+        group = parser.add_argument_group(f"{cat_name.upper()} OPTIONS")
+        for unit_key, data in units.items():
+            group.add_argument(f'-{unit_key}', nargs='?', const='OUTPUT', 
+                               metavar='VAL', help=f"Convert from/to {data[0]}")
 
-    parser.add_argument('--b', nargs='?', const='OUTPUT', metavar='VALUE', help='Bits')
-    parser.add_argument('--B', nargs='?', const='OUTPUT', metavar='VALUE', help='Bytes')
-    parser.add_argument('--kb', nargs='?', const='OUTPUT', metavar='VALUE', help='Kilobytes')
+    args_dict = vars(parser.parse_args())
+    active_args = {k: v for k, v in args_dict.items() if v is not None}
+    
+    inputs = [(k, v) for k, v in active_args.items() if v != 'OUTPUT']
+    outputs = [k for k, v in active_args.items() if v == 'OUTPUT']
 
-            
-    args = parser.parse_args()
-    
-    # Determine which argument has a value (input) and which is just a flag (output)
-    input_type = None
-    input_value = None
-    output_type = None
-    
-    # Map CLI argument names to internal format names
-    ARG_TO_FORMAT = {
-        'bin': 'binary',
-        'dec': 'decimal',
-        'hex': 'hex',
-        'oct': 'octal',
-        'C': 'celsius',
-        'F': 'fahrenheit',
-        'K': 'kelvin',
-        'm': 'meters',
-        'km': 'kilometers',
-        'cm': 'centimeters',
-        'mm': 'millimeters',
-        'ft': 'feet',
-        'in': 'inches',
-        'yd': 'yards',
-        'mi': 'miles',
-        'kg': 'kilograms',
-        'g': 'grams',
-        'mg': 'milligrams',
-        'lb': 'pounds',
-        'oz': 'ounces',
-        't': 'tons',
-        's': 'seconds',
-        'min': 'minutes',
-        'h': 'hours',
-        'd': 'days',
-        'w': 'weeks',
-        'b': 'bits',
-        'B': 'bytes',
-        'kb': 'kilobytes',
-    }
-    
-    # Get all argument values
-    arg_values = {
-        'bin': args.bin,
-        'dec': args.dec,
-        'hex': args.hex,
-        'oct': args.oct,
-        'C': args.C,
-        'F': args.F,
-        'K': args.K,
-        'm': args.m,
-        'km': args.km,
-        'cm': args.cm,
-        'mm': args.mm,
-        'ft': args.ft,
-        'in': getattr(args, 'in'),  # 'in' is a Python keyword, use getattr
-        'yd': args.yd,
-        'mi': args.mi,
-        'kg': args.kg,
-        'g': args.g,
-        'mg': args.mg,
-        'lb': args.lb,
-        'oz': args.oz,
-        't': args.t,
-        's': args.s,
-        'min': args.min,
-        'h': args.h,
-        'd': args.d,
-        'w': args.w,
-        'b': args.b,
-        'B': args.B,
-        'kb': args.kb,
-    }
-    
-    for arg_name, value in arg_values.items():
-        if value is not None:
-            format_name = ARG_TO_FORMAT[arg_name]
-            if value == 'OUTPUT':
-                # This is the output format (flag without value)
-                if output_type is not None:
-                    parser.error("Multiple output formats specified")
-                output_type = format_name
-            else:
-                # This is the input format (flag with value)
-                if input_type is not None:
-                    parser.error("Multiple input values specified")
-                input_type = format_name
-                input_value = value
-    
-    # Validate we have both input and output
-    if input_type is None:
-        parser.error("No input value specified")
-    if output_type is None:
-        parser.error("No output format specified")
-    
-    # Prevent converting to same format
-    if input_type == output_type:
-        print(f"Input and output are both {input_type}. No conversion needed.")
-        print(f"{input_type.capitalize()}: {input_value}")
-        return
-    
-    # Display names for formats (for prettier output)
-    DISPLAY_NAMES = {
-        'binary': 'Binary',
-        'decimal': 'Decimal',
-        'hex': 'Hex',
-        'octal': 'Octal',
-        'celsius': 'C',
-        'fahrenheit': 'F',
-        'kelvin': 'K',
-        'meters': 'm',
-        'kilometers': 'km',
-        'centimeters': 'cm',
-        'millimeters': 'mm',
-        'feet': 'ft',
-        'inches': 'in',
-        'yards': 'yd',
-        'miles': 'mi',
-        'kilograms': 'kg',
-        'grams': 'g',
-        'milligrams': 'mg',
-        'pounds': 'lb',
-        'ounces': 'oz',
-        'tons': 't',
-        'seconds': 's',
-        'minutes': 'min',
-        'hours': 'h',
-        'days': 'd',
-        'weeks': 'w',
-        'bits': 'b',
-        'bytes': 'B',
-        'kilobytes': 'kb',
-    }
-    
-    try:
-        # Perform conversion
-        result = convert(input_value, input_type, output_type)
-        
-        # Format output
-        input_display = DISPLAY_NAMES.get(input_type, input_type.capitalize())
-        output_display = DISPLAY_NAMES.get(output_type, output_type.capitalize())
-        
-        print(f"{input_value} {input_display} = {result} {output_display}")
-    
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
+    if not inputs or not outputs:
+        parser.print_help()
         sys.exit(1)
+
+    # Use only the first provided input
+    in_key, in_val = inputs[0]
+    in_cat, in_name, to_inter, _ = FLAT_MAP[in_key]
+    
+    for out_key in outputs:
+        out_cat, out_name, _, from_inter = FLAT_MAP[out_key]
+
+        if in_cat != out_cat:
+            print(f"Error: Cannot convert {in_name} to {out_name}")
+            continue
+
+        try:
+            result = from_inter(to_inter(in_val))
+            
+            # Pluralize the unit names based on their values
+            in_display = pluralize(in_name, in_val)
+            out_display = pluralize(out_name, result)
+            
+            # Format: "1 hour = 60 minutes" or "2 hours = 120 minutes"
+            print(f"{in_val} {in_display} = {result} {out_display}")
+        except ValueError:
+            print(f"Error: '{in_val}' is not a valid {in_name} value.")
 
 if __name__ == "__main__":
     main()
