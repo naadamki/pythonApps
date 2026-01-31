@@ -97,13 +97,12 @@ UNIT_DATA = {
 }
 
 
-
-
 FLAT_MAP = {
     unit: (cat, data[0], data[1], data[2])
     for cat, units in UNIT_DATA.items()
     for unit, data in units.items()
 }
+
 
 def pluralize(value, unit):
     PLURAL_EXCEPTIONS = {'foot': 'feet', 'inch': 'inches'}
@@ -124,8 +123,84 @@ def pluralize(value, unit):
     return unit + 's'
 
 
+class ConversionResult:
+    """Represents the result of a unit conversion."""
+    
+    def __init__(self, original_value, source_unit, target_unit, converted_value):
+        self.original_value = original_value
+        self.source_unit = source_unit
+        self.target_unit = target_unit
+        self.converted_value = converted_value
+    
+    def __repr__(self):
+        source_name = pluralize(self.original_value, FLAT_MAP[self.source_unit][1])
+        target_name = pluralize(self.converted_value, FLAT_MAP[self.target_unit][1])
+        return f"{self.original_value} {source_name} = {self.converted_value} {target_name}"
+
+
+class UnitConverter:
+    """
+    Converts values between units within the same category.
+    
+    Usage:
+        converter = UnitConverter(5, 'km')
+        result = converter.convert('mi')
+        print(result.converted_value)  # 3.1069
+    """
+    
+    def __init__(self, value, unit):
+        if unit not in FLAT_MAP:
+            raise ValueError(f"Unknown unit: {unit}")
+        
+        self.value = value
+        self.unit = unit
+        
+        # Look up unit metadata
+        self.category, self.unit_name, to_standard, _ = FLAT_MAP[unit]
+        
+        # Convert to standard unit for this category (e.g., meters for length)
+        self.standard_value = to_standard(value)
+    
+    def convert(self, target_unit):
+        """
+        Convert to the specified target unit.
+        
+        Args:
+            target_unit: The unit code to convert to (e.g., 'ft', 'mi', 'kg')
+        
+        Returns:
+            ConversionResult object with conversion details
+        
+        Raises:
+            ValueError: If target_unit is unknown or incompatible
+        """
+        if target_unit not in FLAT_MAP:
+            raise ValueError(f"Unknown unit: {target_unit}")
+        
+        target_category, target_name, _, from_standard = FLAT_MAP[target_unit]
+        
+        if target_category != self.category:
+            raise ValueError(
+                f"Cannot convert {self.unit_name} to {target_name} "
+                f"(incompatible categories: {self.category} vs {target_category})"
+            )
+        
+        converted_value = from_standard(self.standard_value)
+        
+        return ConversionResult(
+            original_value=self.value,
+            source_unit=self.unit,
+            target_unit=target_unit,
+            converted_value=converted_value
+        )
+    
+    def __repr__(self):
+        return f"UnitConverter(value={self.value}, unit='{self.unit}')"
+
+
+
 def main():
-    custom_usage = '%(prog)s VALUE FROM -TO [-TO] [-TO]...'
+    custom_usage = '%(prog)s VALUE SOURCE -TARGET [-TARGET] [-TARGET]...'
     
     parser = argparse.ArgumentParser(
         description='Unit converter - units can only convert within the same category',
@@ -137,13 +212,10 @@ def main():
         type=int,
         help='Value to convert')
 
-    all_unit_keys = [unit_key for units in UNIT_DATA.values() for unit_key in units.keys()]
-
     all_units = [unit for unit_key, data in FLAT_MAP.items() for unit in (unit_key, data[1])]
 
-
     ## THIS ARGUMENT HERE
-    parser.add_argument('from_unit',
+    parser.add_argument('source_unit',
         choices=all_units,
         help=argparse.SUPPRESS
     )
@@ -158,40 +230,18 @@ def main():
                 f'-{unit_key}', f'--{data[0]}',
                 action='append_const',
                 const=f'{unit_key}',
-                dest='to_units',
+                dest='target_units',
                 help=f'convert to {data[0]}'
             )
 
     args = parser.parse_args()
 
-    if args.from_unit not in FLAT_MAP.keys():
-        for key, data in FLAT_MAP.items():
-            if data[1] == args.from_unit:
-                from_unit = key
-    else:
-        from_unit = args.from_unit 
 
+    original_unit = UnitConverter(args.value, args.source_unit)
 
-    from_cat, from_name, to_inter, _ = FLAT_MAP[from_unit]
-
-    if args.to_units:
-        for unit in args.to_units:
-            to_cat, to_name, _, from_inter = FLAT_MAP[unit]
-
-            if to_cat != from_cat:
-                print(f"Error: Cannot convert {from_name} to {to_name}")
-                continue        
-
-            try:
-                result = from_inter(to_inter(args.value))
-
-                from_display = pluralize(args.value, from_name)
-                to_display = pluralize(result, to_name)
-
-                print(f'{args.value} {from_display} = {result} {to_display}')
-            except ValueError:
-                print(f"Error: '{args.value}' is not a valid {from_name} value.")
-
+    for unit in args.target_units:
+        result = original_unit.convert(unit)
+        print(result)
 
 
 if __name__ == '__main__':
