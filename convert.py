@@ -29,13 +29,13 @@ UNIT_DATA = {
     },
     'weight': {
         # Metric 
-        't':   ('metricton',   lambda x: float(x) * 1000,                  lambda x: round(x / 1000, 4)),
+        't':   ('metric-ton',   lambda x: float(x) * 1000,                  lambda x: round(x / 1000, 4)),
         'kg':  ('kilogram',     lambda x: float(x),                         lambda x: round(x, 4)),
         'g':   ('gram',         lambda x: float(x) / 1000,                  lambda x: round(x * 1000, 4)),
         'mg':  ('milligram',    lambda x: float(x) / 1_000_000,             lambda x: round(x * 1_000_000, 4)),
         'ug':  ('microgram',    lambda x: float(x) / 1_000_000_000,         lambda x: round(x * 1_000_000_000, 4)),
         # Imperial 
-        'ton': ('ton',       lambda x: float(x) * 907.185,               lambda x: round(x / 907.185, 4)),
+        'ton': ('ton',          lambda x: float(x) * 907.185,               lambda x: round(x / 907.185, 4)),
         'st':  ('stone',        lambda x: float(x) * 6.35029,               lambda x: round(x / 6.35029, 4)),
         'lb':  ('pound',        lambda x: float(x) * 0.453592,              lambda x: round(x / 0.453592, 4)),
         'oz':  ('ounce',        lambda x: float(x) * 0.0283495,             lambda x: round(x / 0.0283495, 4)),
@@ -52,7 +52,7 @@ UNIT_DATA = {
         'qt':  ('quart',        lambda x: float(x) * 0.946353,              lambda x: round(x / 0.946353, 4)),
         'pt':  ('pint',         lambda x: float(x) * 0.473176,              lambda x: round(x / 0.473176, 4)),
         'cup': ('cup',          lambda x: float(x) * 0.236588,              lambda x: round(x / 0.236588, 4)),
-        'floz':('fluidounce',  lambda x: float(x) * 0.0295735,             lambda x: round(x / 0.0295735, 4)),
+        'floz':('fluid-ounce',   lambda x: float(x) * 0.0295735,             lambda x: round(x / 0.0295735, 4)),
         'tbsp':('tablespoon',   lambda x: float(x) * 0.0147868,             lambda x: round(x / 0.0147868, 4)),
         'tsp': ('teaspoon',     lambda x: float(x) * 0.00492892,            lambda x: round(x / 0.00492892, 4)),
     },
@@ -139,22 +139,21 @@ class ConversionResult:
 
 
 class UnitConverter:
-    """
-    Converts values between units within the same category.
-    
-    Usage:
-        converter = UnitConverter(5, 'km')
-        result = converter.convert('mi')
-        print(result.converted_value)  # 3.1069
-    """
+    """Converts values between units within the same category."""
     
     def __init__(self, value, unit):
-        if unit not in FLAT_MAP:
-            raise ValueError(f"Unknown unit: {unit}")
+        # if unit not in FLAT_MAP:
+        #     raise ValueError(f"Unknown unit: {unit}")
         
         self.value = value
+
+        if unit not in FLAT_MAP.keys():
+            for unit_key, data in FLAT_MAP.items():
+                if unit == data[1]:
+                    unit = unit_key
+                    
         self.unit = unit
-        
+
         # Look up unit metadata
         self.category, self.unit_name, to_standard, _ = FLAT_MAP[unit]
         
@@ -162,18 +161,8 @@ class UnitConverter:
         self.standard_value = to_standard(value)
     
     def convert(self, target_unit):
-        """
-        Convert to the specified target unit.
-        
-        Args:
-            target_unit: The unit code to convert to (e.g., 'ft', 'mi', 'kg')
-        
-        Returns:
-            ConversionResult object with conversion details
-        
-        Raises:
-            ValueError: If target_unit is unknown or incompatible
-        """
+        """Convert to the specified target unit."""
+
         if target_unit not in FLAT_MAP:
             raise ValueError(f"Unknown unit: {target_unit}")
         
@@ -214,7 +203,6 @@ def main():
 
     all_units = [unit for unit_key, data in FLAT_MAP.items() for unit in (unit_key, data[1])]
 
-    ## THIS ARGUMENT HERE
     parser.add_argument('source_unit',
         choices=all_units,
         help=argparse.SUPPRESS
@@ -234,8 +222,14 @@ def main():
                 help=f'convert to {data[0]}'
             )
 
-    args = parser.parse_args()
+    parser.add_argument(
+        '-com', '--compatible',
+        type=str,
+        help='Display list of compatible units'
 
+    )
+
+    args = parser.parse_args()
 
     original_unit = UnitConverter(args.value, args.source_unit)
 
