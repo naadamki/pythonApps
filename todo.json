@@ -1,0 +1,44 @@
+{
+    "tasks": {
+        "buy milk": {
+            "title": "buy milk",
+            "description": "go to kroger and get milk",
+            "category": "groceries",
+            "project": "home",
+            "completed": false
+        },
+        "finish report": {
+            "title": "finish report",
+            "description": null,
+            "category": "urgent",
+            "project": "work",
+            "completed": false
+        },
+        "update timecard": {
+            "title": "update timecard",
+            "description": "adp update",
+            "category": "necessary",
+            "project": "work",
+            "completed": false
+        },
+        "paint trim": {
+            "title": "paint trim",
+            "description": "paint everything",
+            "category": "renovation",
+            "project": "renovation",
+            "completed": false
+        }
+    },
+    "projects": [
+        "General",
+        "home",
+        "work",
+        "renovation"
+    ],
+    "categories": [
+        "groceries",
+        "urgent",
+        "renovation",
+        "necessary"
+    ]
+}

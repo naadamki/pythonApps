@@ -1,0 +1,36 @@
+{
+    "tasks": {
+        "finish report": {
+            "title": "finish report",
+            "description": null,
+            "category_name": "urgent",
+            "project_name": "work",
+            "completed": false
+        },
+        "paint walls": {
+            "title": "paint walls",
+            "description": null,
+            "category_name": "renovation",
+            "project_name": "home",
+            "completed": false
+        },
+        "input time": {
+            "title": "input time",
+            "description": null,
+            "category_name": "necessary",
+            "project_name": "work",
+            "completed": false
+        }
+    },
+    "projects": [
+        "General",
+        "home",
+        "work"
+    ],
+    "categories": [
+        "groceries",
+        "urgent",
+        "renovation",
+        "necessary"
+    ]
+}
