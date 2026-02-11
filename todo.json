@@ -5,6 +5,7 @@
             "description": "go to kroger and get milk",
             "category": "groceries",
             "project": "home",
+            "urgent": true,
             "completed": false
         },
         "finish report": {
@@ -12,6 +13,7 @@
             "description": null,
             "category": "urgent",
             "project": "work",
+            "urgent": false,
             "completed": false
         },
         "update timecard": {
@@ -19,6 +21,7 @@
             "description": "adp update",
             "category": "necessary",
             "project": "work",
+            "urgent": false,
             "completed": false
         },
         "paint trim": {
@@ -26,6 +29,7 @@
             "description": "paint everything",
             "category": "renovation",
             "project": "renovation",
+            "urgent": false,
             "completed": false
         }
     },

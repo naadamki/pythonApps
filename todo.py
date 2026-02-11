@@ -32,8 +32,6 @@ class Task:
         self.completed = not self.completed
 
 
-
-
 class Manager:
     def __init__(self, filename='todo.json'):
         self.filename = filename
@@ -152,7 +150,7 @@ class Manager:
         self.save_data()
         print(f"Task '{title}' updated successfully.")
 
-    def toggle_task_urgent(self, title):
+    def toggle_task_urgency(self, title):
         if title in self.tasks:
             self.tasks[title].toggle_urgent()
             self.save_data()
